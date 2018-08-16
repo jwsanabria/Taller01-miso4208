@@ -21,9 +21,17 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <link rel="canonical" href="https://weather-pwa-sample.firebaseapp.com/final/">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#2F3BA2"/>
   <title>Paris Métro 1</title>
   <link rel="stylesheet" type="text/css" href="styles/inline.css">
-
+  <link rel="manifest" href="/manifest.json">
+    <!-- Add to home screen for Safari on iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="white">
+    <meta name="apple-mobile-web-app-title" content="Paris Metro">
+    <link rel="apple-touch-icon" href="images/icons/icon-128x128.png">
+    <meta name="msapplication-TileImage" content="images/icons/icon-128x128.png">
+    <meta name="msapplication-TileColor" content="#FFFFF">
 </head>
 <body>
 
@@ -92,7 +100,15 @@
   </div>
 
   <!-- Uncomment the line below when ready to test with fake data -->
+  <script src="https://cdn.jsdelivr.net/npm/idb-keyval@3/dist/idb-keyval-iife.min.js"></script>
+<!-- Or in modern browsers: -->
+<script type="module">
+  import { get, set } from 'https://cdn.jsdelivr.net/npm/idb-keyval@3/dist/idb-keyval.mjs';
+</script> 
+  <script src="scripts/idb.js" ></script>
   <script src="scripts/app.js" async></script>
+
+ 
 
 </body>
 </html>

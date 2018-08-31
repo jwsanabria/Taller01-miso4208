@@ -1,7 +1,6 @@
 (function () {
     'use strict';
 
-
     var app = {
         isLoading: true,
         visibleCards: {},
@@ -9,11 +8,10 @@
         spinner: document.querySelector('.loader'),
         cardTemplate: document.querySelector('.cardTemplate'),
         container: document.querySelector('.main'),
-        addDialog: document.querySelector('.dialog-container')
+        addDialog: document.querySelector('.dialog-container'),
+        indexedDBName: "SchedulesDB"
     };
 
-
-    
 
     /*****************************************************************************
      *
@@ -32,8 +30,6 @@
     });
 
     document.getElementById('butAddCity').addEventListener('click', function () {
-
-
         var select = document.getElementById('selectTimetableToAdd');
         var selected = select.options[select.selectedIndex];
         var key = selected.value;
@@ -42,8 +38,8 @@
             app.selectedTimetables = [];
         }
         app.getSchedule(key, label);
-        app.selectedTimetables.push({key: key, label: label});
-        app.saveSelectedStation();
+        app.selectedTimetables.push({ key: key, label: label });
+        app.saveSelectedTimetables();
         app.toggleAddDialog(false);
     });
 
@@ -89,29 +85,19 @@
             app.container.appendChild(card);
             app.visibleCards[key] = card;
         }
-
-        var cardLastUpdatedElem = card.querySelector('.card-last-updated');
-        var cardLastUpdated = cardLastUpdatedElem.textContent;
-        if (cardLastUpdated) {
-            cardLastUpdated = new Date(cardLastUpdated);
-            // Bail if the card has more recent data then the data
-            if (dataLastUpdated.getTime() < cardLastUpdated.getTime()) {
-                return;
-            }
-        }
-
         card.querySelector('.card-last-updated').textContent = data.created;
 
         var scheduleUIs = card.querySelectorAll('.schedule');
-        for(var i = 0; i<4; i++) {
+        for (var i = 0; i < 4; i++) {
             var schedule = schedules[i];
             var scheduleUI = scheduleUIs[i];
-            if(schedule && scheduleUI) {
+            if (schedule && scheduleUI) {
                 scheduleUI.querySelector('.message').textContent = schedule.message;
             }
         }
 
         if (app.isLoading) {
+            window.cardLoadTime = performance.now();
             app.spinner.setAttribute('hidden', true);
             app.container.removeAttribute('hidden');
             app.isLoading = false;
@@ -134,29 +120,24 @@
              * data. If the service worker has the data, then display the cached
              * data while the app fetches the latest data.
              */
-            caches.match(url).then(function(response) {
-              if (response) {
-                response.json().then(function updateFromCache(json) {
-                    
-                  //var results = json.query.results;
-                  var results = JSON.parse(JSON.stringify(json));
-                  var item;
-                  results.key = key;
-                  results.label = label;
-                  results.created = results._metadata.date;
-                  results.schedules = results.result.schedules;
-                  app.updateTimetableCard(results);
-                });
-              }
+            caches.match(url).then(function (response) {
+                if (response) {
+                    response.json().then(function updateFromCache(json) {
+                        var results = json.result;
+                        results.key = key;
+                        results.label = label;
+                        results.created = json._metadata.date;
+                        app.updateTimetableCard(results);
+                    });
+                }
             });
-          }
-
-        
+        }
 
         var request = new XMLHttpRequest();
         request.onreadystatechange = function () {
             if (request.readyState === XMLHttpRequest.DONE) {
                 if (request.status === 200) {
+                    window.APILoadtime  = performance.now();
                     var response = JSON.parse(request.response);
                     var result = {};
                     result.key = key;
@@ -208,157 +189,66 @@
 
     };
 
-
-    /************************************************************************
-     *
-     * Code required to start the app
-     *
-     * NOTE: To simplify this codelab, we've used localStorage.
-     *   localStorage is a synchronous API and has serious performance
-     *   implications. It should not be used in production applications!
-     *   Instead, check out IDB (https://www.npmjs.com/package/idb) or
-     *   SimpleDB (https://gist.github.com/inexorabletash/c8069c042b734519680c)
-     ************************************************************************/
-
-    /*app.getSchedule('metros/1/bastille/A', 'Bastille, Direction La Défense');
-    app.selectedTimetables = [
-        {key: initialStationTimetable.key, label: initialStationTimetable.label}
-    ];*/
-
-    // Save list of station time tables to localStorage.
-    app.saveSelectedStation = function() {
-        var selectedTimetables = JSON.stringify(app.selectedTimetables);
-        //localStorage.selectedTimetables = selectedTimetables;
-        /*var transaction = db.transaction('stations', IDBTransaction.READ_WRITE); 
-        var objstore = transaction.objectStore('stations'); 
-
-        for (i = 0; i < selectedTimetables.length; i++) { 
-            objstore.put(selectedTimetables[i]);
-        } */
-
-        
-         /* var item = JSON.parse(selectedTimetables);
-          if (!('indexedDB' in window)) {return null;}
-  return dbPromise.then(db => {
-    const tx = db.transaction('people', 'readwrite');
-    const store = tx.objectStore('people');
-    return Promise.all(item.map(event => store.put(event)))
-    .catch(() => {
-      tx.abort();
-      throw Error('Events were not added to the store');
-    });
-  });*/
-
-
-        /*for(var i=0; i<selectedTimetables.length; i++){
-            dbPromise.then(function(db) {
-                var tx = db.transaction('logs', 'readwrite');
-                var store = tx.objectStore('logs');
-                
-                store.put(selectedTimetables[i]);
-                return tx.complete;
-              }).then(function() {
-                console.log('added item to the store os!');
-              });
-        }*/
-   // };
-
-    //const dbPromise = createIndexedDB();
-/*    const dbPromise = idb.open('keyval-store', 1, upgradeDB => {
-        upgradeDB.createObjectStore('keyval');
-      });
-
-    function createIndexedDB() {
+    app.saveSelectedTimetables = function () {
         if (!('indexedDB' in window)) {
-            console.log('This browser doesn\'t support IndexedDB');
-            return;
-        }
-
-        return idb.open('test-db4', 1, function(upgradeDb) {
-            if (!upgradeDb.objectStoreNames.contains('people')) {
-              var peopleOS = upgradeDb.createObjectStore('people', {keyPath: 'key'});
-              peopleOS.createIndex('gender', 'gender', {unique: false});
-              peopleOS.createIndex('ssn', 'ssn', {unique: true});
-            }
-            if (!upgradeDb.objectStoreNames.contains('notes')) {
-              var notesOS = upgradeDb.createObjectStore('notes', {autoIncrement: true});
-              notesOS.createIndex('title', 'title', {unique: false});
-            }
-            if (!upgradeDb.objectStoreNames.contains('logs')) {
-              var logsOS = upgradeDb.createObjectStore('logs', {keyPath: 'id',
-                autoIncrement: true});
-            }
-          });
-*/
-idbKeyval.set(selectedTimetables);
-      }
-
-    function getLocalEventData() {
-        if (!('indexedDB' in window)) {return null;}
-        return dbPromise.then(db => {
-          const tx = db.transaction('people', 'readonly');
-          const store = tx.objectStore('people');
-          return store.getAll();
-        });
-      }
-
-      function setTimeTables(keys){
-          console.log(keys);
-          if (keys) {
-            console.log('This browser doesn\'t support IndexedDB: ' + keys.length);
-            //app.selectedTimetables = JSON.parse(app.selectedTimetables);
-            keys.forEach(function(stationTime) {
-                var item = JSON.parse(stationTime);
-                for(var j=0; j<item.length;j++){
-                    console.log(item[j]);
-                    app.getSchedule(item[j].key, item[j].label);
-                }
-            });
+            var selectedTimetables = JSON.stringify(app.selectedTimetables);
+            localStorage.selectedTimetables = selectedTimetables;
         } else {
-            /* The user is using the app for the first time, or the user has not
-            * saved any cities, so show the user some fake data. A real app in this
-            * scenario could guess the user's location via IP lookup and then inject
-            * that data into the page.
-            */
-            //app.updateTimetableCard(initialStationTimetable);
-            app.getSchedule(initialStationTimetable.key, initialStationTimetable.label);
-            app.selectedTimetables = [
-            {key: initialStationTimetable.key, label: initialStationTimetable.label}
-            ];
-            app.saveSelectedStation();
-        };
-    
-      }
-    
-
-    //getLocalEventData().then(app.selectedTimetables);
-    idbKeyval.keys().then(keys => setTimeTables(keys)).catch(err => console.log('It failed!', err));
-    if (app.selectedTimetables.length>0) {
-        console.log('This browser doesn\'t support IndexedDB: ' + app.selectedTimetables.length);
-        //app.selectedTimetables = JSON.parse(app.selectedTimetables);
-        app.selectedTimetables.forEach(function(stationTime) {
-            app.getSchedule(stationTime.key, stationTime.label);
-        });
-    } else {
-        /* The user is using the app for the first time, or the user has not
-        * saved any cities, so show the user some fake data. A real app in this
-        * scenario could guess the user's location via IP lookup and then inject
-        * that data into the page.
-        */
-        //app.updateTimetableCard(initialStationTimetable);
-        app.getSchedule(initialStationTimetable.key, initialStationTimetable.label);
-        app.selectedTimetables = [
-        {key: initialStationTimetable.key, label: initialStationTimetable.label}
-        ];
-        app.saveSelectedStation();
+            var request = window.indexedDB.open(app.indexedDBName, 1);
+            request.onerror = function (event) {
+                console.log(event);
+            };
+            request.onsuccess = function (event) {
+                var db = event.target.result;
+                var timetableObjectStore = db.transaction("timetables", "readwrite").objectStore("timetables");
+                app.selectedTimetables.forEach(function (timetable) {
+                    timetableObjectStore.put(timetable);
+                });
+            };
+        }
     };
 
+    app.initStorage = function (selectedTimetables) {
+        app.selectedTimetables = typeof app.selectedTimetables == 'string' ? JSON.parse(app.selectedTimetables) : selectedTimetables;
+        if (app.selectedTimetables && app.selectedTimetables.length > 0) {
+            app.selectedTimetables = typeof app.selectedTimetables == 'string' ? JSON.parse(app.selectedTimetables) : selectedTimetables;
+            app.selectedTimetables.forEach(function (timetable) {
+                app.getSchedule(timetable.key, timetable.label);
+            });
+        } else {
+            app.updateTimetableCard(initialStationTimetable);
+            app.getSchedule(initialStationTimetable.key, initialStationTimetable.label);
+            app.selectedTimetables = [
+                { key: initialStationTimetable.key, label: initialStationTimetable.label }
+            ];
+            app.saveSelectedTimetables();
+        }
+    };
+
+    if (!('indexedDB' in window)) {
+        app.initStorage(localStorage.selectedTimetables);
+    }
+    else {
+        var request = window.indexedDB.open(app.indexedDBName, 1);
+        request.onerror = function (event) {
+            console.log(event);
+        };
+        request.onupgradeneeded = function (event) {
+            var db = event.target.result;
+            var objectStore = db.createObjectStore("timetables", { keyPath: 'key' });
+        };
+        request.onsuccess = function (event) {
+            var db = event.target.result;
+            db.transaction("timetables").objectStore("timetables").getAll().onsuccess = function (event) {
+                console.log(event.target.result);
+                app.initStorage(event.target.result);
+            };
+        };
+    }
+
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker
-                 .register('./service-worker.js')
-                 .then(function() { console.log('Service Worker Registered'); });
-      };
-
+        navigator.serviceWorker.register('/sw.js').then(function () {
+            console.log("Service Worker Registered");
+        });
+    }
 })();
-
-
